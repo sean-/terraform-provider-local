@@ -1,9 +1,11 @@
 package local
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"os"
+	"strconv"
+
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func resourceLocalDirectory() *schema.Resource {
@@ -21,11 +23,12 @@ func resourceLocalDirectory() *schema.Resource {
 				ForceNew:    true,
 			},
 			"directory_permission": {
-				Type:        schema.TypeInt,
-				Description: "Permissions to set for directories created",
-				Optional:    true,
-				ForceNew:    false,
-				Default:     0777,
+				Type:         schema.TypeString,
+				Description:  "Permissions to set for directories created",
+				Optional:     true,
+				ForceNew:     false,
+				Default:      "0777",
+				ValidateFunc: validateMode,
 			},
 		},
 	}
@@ -35,28 +38,28 @@ func resourceLocalDirectoryRead(d *schema.ResourceData, _ interface{}) error {
 	// If the output directory doesn't exist, mark the resource for creation.
 	wantedDirectory := d.Get("directory").(string)
 	dirInfo, err := os.Stat(wantedDirectory)
-	if os.IsNotExist(err) {
+	switch {
+	case os.IsNotExist(err):
 		d.SetId("")
 		return nil
-	}
-	if err != nil {
+	case err != nil:
 		return err
 	}
 	d.SetId(wantedDirectory)
 
 	// The directory might have been modified externally and we might have to reconcile.
-	dirPermission := int(dirInfo.Mode().Perm())
-	log.Printf("[INFO] wanted %d, current %d", d.Get("directory_permission"), int(dirInfo.Mode().Perm()))
+	dirPermission := dirInfo.Mode().Perm()
+	log.Printf("[INFO] wanted %d, current %d", d.Get("directory_permission"), dirPermission)
 	d.Set("directory_permission", dirPermission)
 	return nil
 }
 
 func resourceLocalDirectoryUpdate(d *schema.ResourceData, _ interface{}) error {
 	wantedDirectory := d.Get("directory").(string)
-	wantedPermission := d.Get("directory_permission").(int)
+	wantedPermission := os.FileMode(d.Get("directory_permission").(int))
 
-	if dirInfo, _ := os.Stat(wantedDirectory); int(dirInfo.Mode().Perm()) != wantedPermission {
-		if err := os.Chmod(wantedDirectory, os.FileMode(wantedPermission)); err != nil {
+	if dirInfo, _ := os.Stat(wantedDirectory); dirInfo.Mode().Perm() != wantedPermission {
+		if err := os.Chmod(wantedDirectory, wantedPermission); err != nil {
 			log.Printf("[ERROR] error trying to modify permissions of directory %s to %d", wantedDirectory, wantedPermission)
 			return err
 		}
@@ -69,7 +72,9 @@ func resourceLocalDirectoryUpdate(d *schema.ResourceData, _ interface{}) error {
 
 func resourceLocalDirectoryCreate(d *schema.ResourceData, _ interface{}) error {
 	wantedDirectory := d.Get("directory").(string)
-	wantedPermission := d.Get("directory_permission").(int)
+	wantedPermissionStr := d.Get("directory_permission").(string)
+	wantedPermissionInt, _ := strconv.ParseInt(wantedPermissionStr, 8, 64)
+	wantedPermission := os.FileMode(wantedPermissionInt)
 
 	_, errStat := os.Stat(wantedDirectory)
 	if errStat != nil && !os.IsNotExist(errStat) {
@@ -78,7 +83,7 @@ func resourceLocalDirectoryCreate(d *schema.ResourceData, _ interface{}) error {
 	}
 
 	if os.IsNotExist(errStat) {
-		if err := os.MkdirAll(wantedDirectory, os.FileMode(wantedPermission)); err != nil {
+		if err := os.MkdirAll(wantedDirectory, wantedPermission); err != nil {
 			log.Printf("[ERROR] error trying to create directory %s", wantedDirectory)
 			return err
 		}
@@ -89,8 +94,8 @@ func resourceLocalDirectoryCreate(d *schema.ResourceData, _ interface{}) error {
 		if err != nil {
 			return err
 		}
-		if int(dirInfo.Mode().Perm()) != wantedPermission {
-			if err := os.Chmod(wantedDirectory, os.FileMode(wantedPermission)); err != nil {
+		if dirInfo.Mode().Perm() != wantedPermission {
+			if err := os.Chmod(wantedDirectory, wantedPermission); err != nil {
 				log.Printf("[ERROR] error trying to modify permissions of directory %s to %d", wantedDirectory, wantedPermission)
 				return err
 			}

@@ -1,8 +1,9 @@
 package local
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
 	"os"
+
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func dataSourceLocalDirectory() *schema.Resource {
@@ -21,7 +22,7 @@ func dataSourceLocalDirectory() *schema.Resource {
 				Description: "Permissions to set for directories created",
 				Optional:    true,
 				ForceNew:    true,
-				Default:     0777,
+				Default:     "0777",
 			},
 		},
 	}

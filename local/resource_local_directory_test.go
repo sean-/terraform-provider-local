@@ -6,14 +6,14 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/terraform/helper/resource"
-	"github.com/hashicorp/terraform/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
 func TestLocalDirectory_Basic(t *testing.T) {
 	var tests = []struct {
 		directory            string
-		directory_permission int
+		directory_permission os.FileMode
 		config               string
 	}{
 		{
@@ -27,6 +27,7 @@ func TestLocalDirectory_Basic(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run("", func(t *testing.T) {
 			resource.UnitTest(t, resource.TestCase{
 				Providers: testProviders,
@@ -38,19 +39,21 @@ func TestLocalDirectory_Basic(t *testing.T) {
 							if err != nil {
 								return fmt.Errorf("config:\n%s\n,got: %s\n", test.config, err)
 							}
-							if int(dirInfo.Mode().Perm()) != test.directory_permission {
-								return fmt.Errorf("config:\n%s\ngot:\n%d\nwant:\n%d\n", test.config, int(dirInfo.Mode().Perm()), test.directory_permission)
+							if dirInfo.Mode().Perm() != test.directory_permission {
+								return fmt.Errorf("config:\n%s\ngot:\n%+v\nwant:\n%+v\n", test.config, dirInfo.Mode().Perm(), test.directory_permission)
 							}
 							return nil
 						},
 					},
 				},
-				CheckDestroy: func(*terraform.State) error {
-					if _, err := os.Stat(test.directory); os.IsNotExist(err) {
-						return nil
-					}
-					return errors.New("local_directory did not get destroyed")
-				},
+				CheckDestroy: resource.ComposeTestCheckFunc(
+					func(*terraform.State) error {
+						if _, err := os.Stat(test.directory); os.IsNotExist(err) {
+							return nil
+						}
+						return errors.New("local_directory did not get destroyed")
+					},
+				),
 			})
 		})
 	}

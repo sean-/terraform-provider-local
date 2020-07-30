@@ -1,8 +1,9 @@
 package local
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
 	"os"
+
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func resourceLocalSymlink() *schema.Resource {

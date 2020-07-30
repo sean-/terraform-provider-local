@@ -8,6 +8,7 @@ NOTES:
 NEW FEATURES:
 
 * r/local_file: allow for configurable permissions ([#30](https://github.com/terraform-providers/terraform-provider-local/issues/30))
+* r/local_directory: allow for the creation of directories ([#14](https://github.com/hashicorp/terraform-provider-local/pull/14))
 
 ## 1.3.0 (June 26, 2019)
 
